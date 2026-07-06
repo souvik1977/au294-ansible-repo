@@ -1,0 +1,20 @@
+---
+- name: Test Play - Registering output to a variable and display using loop
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Looping echo task 
+      ansible.builtin.shell: |
+         echo "this is my item {{ item }}"
+      loop:
+        - one
+        - two
+      register: play_output
+  
+    - name: Displaying Output 
+      ansible.builtin.debug:
+         msg: |
+           "STDOUT from previous task {{ item.stdout}}"
+      loop: "{{ play_output['results'] }}"
+      loop_control:
+        label: "{{ item.item }}"
