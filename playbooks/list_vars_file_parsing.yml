@@ -1,0 +1,12 @@
+---
+- name: parsing-list-variables-defined-inside-playbook
+  hosts: localhost
+  vars_files:
+    - files/users.yml
+  tasks:
+    - name: display-users
+      ansible.builtin.debug:
+        msg: >
+         "User Name '{{ item.name }}' and UID {{ item.uid }}"
+      delegate_to: localhost
+      loop: "{{ users }}"

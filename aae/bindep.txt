@@ -1,0 +1,3 @@
+cat bindep.txt
+openssh-clients [platform:rpm]
+iputils [platform:rpm]

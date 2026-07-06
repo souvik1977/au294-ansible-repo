@@ -1,0 +1,145 @@
+---
+- name: webserver play book
+  hosts: webserver
+  become: true
+  become_method: sudo
+  become_user: root
+  vars:
+    firewall_pkg: firewalld
+    firewall_svc: firewalld
+    web_pkg: httpd
+    web_svc: httpd
+    ssl_pkg: mod_ssl
+    httpd_tools_pkg: httpd-tools
+    httpdconf_src: files/httpd.conf
+    httpdconf_dest: /etc/httpd/conf/httpd.conf
+    htaccess_src: files/.htaccess
+    secrets_dir: /etc/httpd/secrets
+    secrets_src: files/htpasswd
+    secrets_dest: "{{ secrets_dir }}/htpasswd"
+    web_root: /var/www/html
+    ssl_cert_file: server.crt
+    ssl_cert_key_file: server.key
+    ssl_path: /etc/httpd/ssl
+  tasks:
+    - name: install packages
+      ansible.builtin.dnf:
+        name:
+          - "{{ firewall_pkg }}"
+          - "{{ web_pkg }}"
+          - "{{ ssl_pkg }}"
+          - "{{ httpd_tools_pkg }}"
+        state: present
+
+
+    - name: copy "{{ httpdconf_src }}" files to target servers
+      ansible.builtin.copy:
+        src: "{{httpdconf_src}}"
+        dest: "{{httpdconf_dest}}"
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Create internal system SSL configuration folder on target servers
+      ansible.builtin.file:
+        path: /etc/httpd/ssl
+        state: directory
+        mode: '0700'
+
+    - name: Copying server certificate and key file for apache
+      ansible.builtin.copy:
+        src: "files/{{ item }}"
+        dest: "{{ssl_path }}/{{item}}"
+        mode: '0600'
+      loop:
+        - "{{ ssl_cert_file }}"
+        - "{{ ssl_cert_key_file }}"
+
+    - name: creating "{{ secrets_dir }}" to target servers
+      ansible.builtin.file:
+       path: "{{ secrets_dir }}"
+       state: directory
+       owner: apache
+       group: apache
+       mode: '0500'
+
+    - name: copying htpasswd file to taget servers
+      ansible.builtin.copy:
+        src: "{{ secrets_src }}"
+        dest: "{{ secrets_dest }}"
+        owner: apache
+        group: apache
+        mode: '0400'
+
+    - name: creat '.htaccess' file to taget servers
+      ansible.builtin.copy:
+        src: "{{ htaccess_src }}"
+        dest: "{{ web_root }}/.htaccess"
+        owner: apache
+        group: apache
+        mode: '0400'
+
+    - name: create 'web-content' file to target servers
+      ansible.builtin.copy:
+        content: >
+          {{ansibl_facts['fqdn'] }}
+          ({{ ansible_facts['default_ipv4']['address'] }})
+          has been customized by Ansible."
+        dest: "{{ web_root }}/index.html"
+        owner: apache
+        group: apache
+        mode: '0644'
+
+    - name: start and enabling 'firewalld' service on the target servers
+      ansible.builtin.systemd_service:
+        name: "{{ firewall_svc }}"
+        state: started
+        enabled: true
+
+    - name: allowing 'https' service over the firewall
+      ansible.posix.firewalld:
+         state: enabled
+         service: https
+         permanent: yes
+         immediate: yes
+
+    - name: Validate Apache Configuration
+      ansible.builtin.command:
+        cmd: httpd -t
+      changed_when: false
+
+    - name: enable and start '{{ web_svc }}' on the target servers
+      ansible.builtin.systemd_service:
+        name: "{{ web_svc }}"
+        state: restarted
+        enabled: true
+      
+
+- name: Test Authentication on the target servers
+  hosts: serverD.domain24.example.net
+  become: false
+  vars:
+    web_user: guest
+  vars_files:
+    - vars/secret.yml
+  tasks:
+    - name: testing connectivity to the remote server
+      ansible.builtin.uri:
+         url: https://serverb.domain24.example.com
+         validate_certs: false
+         force_basic_auth: true
+         user: "{{ web_user }}"
+         password: "{{ web_pass }}"
+         return_content: true
+         status_code: 200
+      register: auth_test
+      loop:
+        - {servername: serverB.domain24.example.net}
+        - {servername: serverC.domain24.example.net}
+
+    - name: Display Results
+      ansible.builtin.debug:
+        msg: "{{ item.content | trim }}"
+      loop: "{{ auth_test.results }}"
+      loop_control:
+        label: "{{ item.item.servername }}"

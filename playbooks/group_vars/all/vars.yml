@@ -1,0 +1,6 @@
+---
+server_pkg: cockpit
+firewall_pkg: firewalld
+server_svc: cockpit.socket
+firewall_svc: firewalld
+firewall_rule: cockpit

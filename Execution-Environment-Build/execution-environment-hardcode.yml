@@ -1,0 +1,28 @@
+version: 3
+images:
+  base_image:
+    name: ghcr.io/ansible-community/community-ee-minimal:latest
+
+dependencies:
+  ansible_core:
+    package_pip: ansible-core==2.16.6
+  ansible_runner:
+    package_pip: ansible-runner==2.3.4
+  galaxy: requirements.yml
+  python: requirements.txt
+  system: bindep.txt
+
+additional_build_files:
+  - src: files/controller-key
+    dest: ssh/
+
+additional_build_steps:
+  append_final:
+    - RUN useradd -m devops
+    - RUN mkdir -p ~/devops/.ssh
+    - COPY --chown=devops:devops _build/ssh/controller-key /home/devops/.ssh/controller-key
+    - RUN chmod 600 /home/devops/.ssh/controller-key
+    - RUN echo "Host *" >> /home/devops/.ssh/config
+    - RUN echo "   IdentityFile /home/devops/.ssh/controller-key" >> /home/devops/.ssh/config
+    - RUN echo "   StrictHostKeyChecking no" >> /home/devops/.ssh/config
+    - RUN chown -R devops:devops /home/devops/.ssh || true

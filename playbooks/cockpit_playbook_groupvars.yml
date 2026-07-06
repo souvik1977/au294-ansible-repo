@@ -1,0 +1,56 @@
+# Ensure that your base directory contains group_vars/all/vars.yml, group_vars/prod/vars.yml and group_vars/nonprod/vars.yml
+---
+- name: Deploy and start cockpit service
+  hosts: all
+  become: true
+  become_user: root
+  become_method: sudo
+  tasks:
+    - name: Installe required packages
+      ansible.builtin.dnf:
+        name:
+          - "{{ server_pkg }}"
+          - "{{ firewall_pkg }}"
+        state: present
+    - name: start and enable {{ firewall_svc }}
+      ansible.builtin.systemd_service:
+        name: "{{ firewall_svc }}"
+        enabled: true
+        state: started
+
+    - name: start and enable {{ server_svc }}
+      ansible.builtin.systemd_service:
+        name: "{{ server_svc }}"
+        enabled: true
+        state: started
+
+    - name: allowing {{ firewall_rule }} into {{ firewall_svc }}
+      ansible.builtin.firewalld:
+        service: "{{ firewall_rule }}"
+        permanent: true
+        state: enabled
+        immediate: true
+
+- name: Create the prod user with the correct uid for {{ usr }}
+  hosts: prod
+  become: true
+  become_user: root
+  become_method: sudo
+  tasks:
+    - name: Create the user and set the uid for {{ usr }}
+      ansible.builtin.user:
+        name: "{{ usr }}"
+        state: present
+        uid: "{{ uid }}"
+
+- name: Create the dev user with the correct uid for {{ usr }}
+  hosts: nonprod
+  become: true
+  become_user: root
+  become_method: sudo
+  tasks:
+    - name: Create the user and set the uid for {{ usr }}
+      ansible.builtin.user:
+        name: "{{ usr }}"
+        state: present
+        uid: "{{ uid }}"

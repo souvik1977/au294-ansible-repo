@@ -1,0 +1,7 @@
+users:
+    - name: alice
+      uid: 1001
+    - name: bob
+      uid: 1002
+    - name: jane
+      uid: 1003

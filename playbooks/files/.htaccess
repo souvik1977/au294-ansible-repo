@@ -1,0 +1,11 @@
+# Turn on the rewrite engine
+RewriteEngine on
+
+# Force HTTPS connections
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+AuthType Basic
+AuthName "Restricted Admin Area"
+AuthUserFile /etc/httpd/secrets/htpasswd
+Require valid-user

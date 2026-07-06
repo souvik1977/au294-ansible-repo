@@ -1,0 +1,38 @@
+# Create system container
+FROM docker.io/almalinux/10-base:latest
+
+LABEL description="AlmaLinux 10 VM-Equivalent System Container for Ansible Testing"
+
+# 1. Install Systemd, DBus, SSH, and fundamental administrative tools
+RUN dnf install -y \
+    systemd \
+    dbus \
+    openssh-server \
+    sudo \
+    hostname \
+    iproute \
+    procps-ng \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf/*
+
+# 2. Tell systemd to optimize itself for container runtime environments
+ENV container=podman
+
+# 3. Secure and enable the system components on boot
+RUN systemctl enable sshd dbus
+
+# 4. Generate system SSH cryptographic host keys 
+RUN ssh-keygen -A
+
+# 5. Provision the dedicated Ansible deployment user with passwordless sudo rights
+RUN useradd -m -s /bin/bash ansibleuser && \
+    echo "ansibleuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# 6. Inject your testing public key file
+RUN mkdir -p /home/ansibleuser/.ssh && chmod 700 /home/ansibleuser/.ssh
+COPY id_rsa.pub /home/ansibleuser/.ssh/authorized_keys
+RUN chmod 600 /home/ansibleuser/.ssh/authorized_keys && \
+    chown -R ansibleuser:ansibleuser /home/ansibleuser/.ssh
+
+# 7. Execute the Linux system initialization process on startup (mimics a VM boot sequence)
+CMD ["/usr/sbin/init"]

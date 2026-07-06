@@ -1,0 +1,24 @@
+version: 3
+images:
+  base_image:
+    name: ghcr.io/ansible-community/community-ee-minimal:latest
+
+dependencies:
+  ansible_core:
+    package_pip: ansible-core==2.20.5
+  ansible_runner:
+    package_pip: ansible-runner==2.4.3
+  galaxy: requirements.yml
+  python: requirements.txt
+  system: bindep.txt
+
+additional_build_files:
+  - src: files/controller-key
+    dest: ssh/
+
+additional_build_steps:
+  append_final:
+    - USER root
+    - RUN dnf install -y openssh-clients && dnf clean all
+    - ENV ANSIBLE_GALAXY_SERVER_TIMEOUT=120
+    - ENV ANSIBLE_GALAXY_DISABLE_GPG_VERIFY=1
