@@ -1,4 +1,7 @@
-------------------------------------- template -------------------------------------------
+# Chapter 3 - Webserver Lab
+
+## Template Setup
+
 [a] Create a 'httpd.conf' template insile your ansible root [in my case 'playbooks'] directory/files:
 vim playbooks/files/httpd.conf [copy the contents from httpd.conf and paste here]
 
@@ -23,7 +26,7 @@ ansible-vault encrypt $HOME/ansible/playbooks/vars/secret.yml --vault-id web-use
 [g] Create pre-configured 'files/htpasswd' file on the ansible host:
 Here we are going to use 'guest' as user name to connect to our webserver followed by the password ['redhat']
 
-Generate a password hash for 'guest' user with 'redhat' password on the controller node: 
+Generate a password hash for 'guest' user with 'redhat' password on the controller node:
 sudo dnf install httpd-tools
 htpasswd -bc /tmp/htpasswd guest redhat
 
@@ -52,13 +55,11 @@ ansible-navigator run playbooks/webserver.yml --vault-password-file ._vault/web-
 [b] Executing at a specific task:
 ansible-navigator run playbooks/webserver.yml --vault-password-file ._vault/web-user --start-at-task "testing connectivity to the remote server"
 
-
 Manual Testing from ServerD:
-curl -vk https://serverB.domain24.example.net
-curl -vk -u guest:<actual_password> https://serverB.domain24.example.net
+curl -vk <https://serverB.domain24.example.net>
+curl -vk -u guest:<actual_password> <https://serverB.domain24.example.net>
 
-curl -vk -u guest:redhat https://serverB.domain24.example.net
-
+curl -vk -u guest:redhat <https://serverB.domain24.example.net>
 
 Troubleshooting:
 On serverB or serverC Check required modules got loaded or not:
@@ -73,12 +74,8 @@ authz_user_module
 Check if htpasswd file is visible to apache on ServerB or ServerC:
 namei -om /etc/httpd/secrets/htpasswd
 
-
 Check the configuraiton:
 httpd -t -D DUMP_RUN_CFG
 
 On ServerB or serverC check if apache is able to read the file:
  sudo -u apache cat /etc/httpd/secrets/htpasswd
-
-
-
