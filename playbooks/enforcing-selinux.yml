@@ -1,0 +1,94 @@
+---
+- name: Enforcing SELinux
+  #hosts: all:!balancer
+  hosts: datacenter_west
+  become: true
+  tasks:
+    - name: 1-Showing Current SELinux Status on the server
+      ansible.builtin.debug:
+        msg: "On {{ ansible_facts['fqdn'] }} SELinux Status is {{ ( ansible_facts['selinux'] | default({})).mode |default('disabled') }}"
+
+    - name: 2-Executing package facts
+      ansible.builtin.package_facts:
+        manager: auto
+      check_mode: false
+
+    - name: 3-check if libselinux-python is installed or not - installed
+      ansible.builtin.debug:
+        msg: "libselinux-python is installed on {{ ansible_facts['fqdn'] }}"
+      when: "'python3-libselinux' in ansible_facts.packages"
+
+    - name: 4-check if libselinux-python is installed or not - not installed
+      ansible.builtin.debug:
+        msg: "libselinux-python is not installed on {{ ansible_facts['fqdn'] }}"
+      when: "'python3-libselinux' not in ansible_facts.packages"
+
+
+    - name: Installing libselinux-python package if not installed
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - selinux-policy-targeted
+        - policycoreutils
+        - policycoreutils-python-utils
+        - libselinux-utils
+        - python3-libselinux
+      #when: "'python3-libselinux' not in ansible_facts.packages"
+      register: package_install
+
+    - name: Refresh ansible_facts after package install
+      ansible.builtin.setup:
+
+    - name: Showing current SELinux Status onf the server
+      ansible.builtin.debug:
+        msg: "On {{ ansible_facts['fqdn'] }} SELinux status is {{ (ansible_facts['selinux'] | default({})).mode | default('disabled') }}"
+
+    - name: Capture SELinux State
+      ansible.builtin.set_fact:
+        initial_selinux_mode: "{{ (ansible_facts['selinux'] | default({})).mode | default('disabled') }}"
+
+    - name: Create .autorelabel file for filesystem retagging
+      ansible.builtin.file:
+        path: /.autorelabel
+        state: touch
+        owner: root
+        group: root
+        mode: '0644'
+      when: initial_selinux_mode in ['permissive', 'disabled']
+
+    - name: Enforcing SELinux if in permissive or disable
+      ansible.posix.selinux:
+        state: enforcing
+        update_kernel_param: true
+        policy: targeted
+      when: initial_selinux_mode in ['permissive', 'disabled']
+      register: selinux_config
+
+
+    - name: Reboot server if SELinux state changed from disabled or permissive
+      ansible.builtin.reboot:
+        msg: "Rebooting to initialize or apply SELinux changes"
+        reboot_timeout: 1200
+        pre_reboot_delay: 2
+      when: selinux_config.changed
+
+- name: Wait for Server and Verify SSH Post-Reboot
+  #hosts: all:!balancer
+  hosts: datacenter_west
+  gather_facts: false
+  tasks:
+    - name: Pause and wait for SSH port 22 to come available
+      ansible.builtin.wait_for_connection:
+        delay: 15
+        timeout: 600
+        connect_timeout: 5
+
+    - name: Confirm final SELinux status post-reboot
+      ansible.builtin.setup:
+      when: selinux_config.changed
+
+    - name: Display final status
+      ansible.builtin.debug:
+        msg: "System successfully reconnected. Active SELinux mode is now: {{ ansible_facts['selinux']['mode']}}"
+      when: selinux_config.changed

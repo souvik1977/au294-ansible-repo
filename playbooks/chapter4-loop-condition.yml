@@ -1,0 +1,50 @@
+---
+- name: Conditoinal Flow
+  hosts: datacenter_west
+  become: true
+  vars:
+    prod_users:
+      - user: marry
+        group: wheel
+      - user: nick
+        group: kvm
+    dev_users:
+      - user: webdev
+        group: developer
+      - user: dbdev
+        group: developer
+  tasks:
+    - name: SELinux Status
+      ansible.builtin.debug:
+        msg: |
+          "SELinux Status on {{ ansible_facts['fqdn'] }}  => {{ ansible_facts['selinux']['mode'] }}"
+
+    - name: Create KVM group if not exists
+      ansible.builtin.group:
+        name: "{{ item.group }}"
+        state: present
+      loop: "{{ prod_users }}"
+      when:  ansible_facts['selinux']['mode']  != 'permissive'
+
+    - name: Add prod users
+      ansible.builtin.user:
+        name: "{{ item['user'] }}"
+        group: "{{ item['group'] }}"
+        state: present
+      loop: "{{ prod_users }}"
+      when:  ansible_facts['selinux']['mode']  != 'permissive'
+
+    - name: Create Developer group if not exists
+      ansible.builtin.group:
+        name: "{{ item.group }}"
+        state: present
+      loop: "{{ dev_users }}"
+      when:  ansible_facts['selinux']['mode']  == 'permissive'
+
+    - name: Add dev users
+      ansible.builtin.user:
+        name: "{{ item['user'] }}"
+        group: "{{ item['group'] }}"
+        state: present
+      loop: "{{ dev_users }}"
+      when:  ansible_facts['selinux']['mode']  == 'permissive'

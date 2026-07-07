@@ -1,0 +1,27 @@
+---
+- name: Installing httpd if not already installed
+  hosts: webserver
+  become: true
+  tasks:
+    - name: Check if httpd is installed
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+      register: httpd_check
+      ignore_errors: true
+
+    - name: Install httpd if not installed
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+      when: httpd_check is not defined or httpd_check.failed
+    
+    - name: Gather httpd version information if installed
+      ansible.builtin.command: httpd -v
+      register: httpd_version
+      when: httpd_check is defined and not httpd_check.failed
+    
+    - name: Display httpd version information
+      ansible.builtin.debug:
+        msg: "httpd version: {{ httpd_version.stdout }}"
+      when: httpd_check is defined and not httpd_check.failed
