@@ -1,0 +1,32 @@
+[nginx-site]
+; Run the pool worker processes under the nginx user account
+user = nginx
+group = nginx
+
+; Establish the Unix socket file path matching the Nginx proxy configuration
+listen = /run/php-fpm/nginx-php.sock
+
+; Security permissions allowing Nginx to read/write to the socket file
+listen.owner = nginx
+listen.group = nginx
+listen.mode = 0660
+
+; Performance tuning parameters for process lifecycle management
+pm = dynamic
+pm.max_children = 50
+pm.start_servers = 5
+pm.min_spare_servers = 5
+pm.max_spare_servers = 35
+pm.max_requests = 500
+
+; Logging parameters
+slowlog = /var/log/php-fpm/nginx-slow.log
+request_slowlog_timeout = 5s
+
+; PHP administrative configuration adjustments
+php_admin_value[error_log] = /var/log/php-fpm/nginx-error.log
+php_admin_flag[log_errors] = on
+php_value[session.save_path]    = /var/lib/php/session
+
+; Restrict PHP file execution scope strictly to the isolated Nginx directory
+php_admin_value[doc_root]       = /var/www/nginx

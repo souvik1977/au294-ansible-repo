@@ -1,0 +1,132 @@
+---
+- name: Play-1 Deploying nginx and php-fpm server
+  hosts: webserver
+  become: true
+  vars:
+    packages:
+      - nginx
+      - php-fpm
+      - firewalld
+    web_service: nginx
+    app_service: php-fpm
+    firewall_service: firewalld
+    firewall_service_rules:
+      - http
+    web_config_src: files/nginx.conf.j2
+    web_config_dst: /etc/nginx/nginx.conf
+    app_config_src: files/php-fpm.conf.j2
+    app_config_dst: /etc/php-fpm.conf
+  tasks:
+    - name: 1 - Install Packages
+      ansible.builtin.dnf:
+        name: "{{ packages }}"
+        state: present
+
+    - name: 2 - Copying web configuration files
+      ansible.builtin.copy:
+        src: "{{ web_config_src }}"
+        dest: "{{ web_config_dst }}"
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart_web_service
+
+    - name: 3 - Copying app configuration file
+      ansible.builtin.copy:
+        src: "{{ app_config_src }}"
+        dest: "{{ app_config_dst }}"
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart_app_service
+
+    - name: 3 - start and enable firewalld if not running
+      ansible.builtin.systemd_service:
+        name: "{{ firewall_service }}"
+        state: started
+        enabled: true
+        masked: false
+
+    - name: 4 - Allowing HTTP over firewalld
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop: "{{ firewall_service_rules }}"
+
+    - name: 5 - Configuring firewall for port 8080 over firewall
+      ansible.posix.firewalld:
+        state: enabled
+        permanent: yes
+        immediate: yes
+        port: 8080/tcp
+
+    - name: 6 - Creating php root directory
+      ansible.builtin.file:
+        path: /var/www/nginx
+        state: directory
+        mode: '0755'
+        owner: nginx
+        group: nginx
+
+    - name: 7 - Configuring a test nginx index.php page
+      ansible.builtin.copy:
+        content: "<?php echo 'Nginx and PHP-FPM stack is running successfully on {{ ansible_facts['fqdn'] }} on port 8080!'; ?>"
+        dest: /var/www/nginx/index.php
+        owner: nginx
+        group: nginx
+        mode: '0644'
+
+    - name: 8 - Registering nginx root directory to SELinux Policy mapping
+      community.general.sefcontext:
+        target: '/var/www/nginx(/.*)?'
+        setype: httpd_sys_content_t
+        state: present
+      register: selinux_dir_context
+
+    - name: 9 - Physically apply the SELinux context on '/var/www/nginx'
+      ansible.builtin.command: restorecon -Rv /var/www/nginx
+      when: selinux_dir_context.changed
+
+    - name: 10 - Starting nginx and php-fpm services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+        masked: false
+      loop:
+        - "{{ app_service }}"
+        - "{{ web_service }}"
+
+
+
+  handlers:
+    - name: restart_app_service
+      ansible.builtin.systemd_service:
+        name: "{{ app_service }}"
+        state: restarted
+
+
+    - name: restart_web_service
+      ansible.builtin.systemd_service:
+        name: "{{ web_service }}"
+        state: restarted
+
+- name: Play-2 Connectivity testing on the webservers
+  hosts: sandbox
+  tasks:
+    - name: Testing Web Connectivity to web servers
+      ansible.builtin.uri:
+        url: http://{{item}}:8080
+        return_content: true
+        status_code: 200
+      register: web_check_result
+      loop: "{{ groups['webserver'] }}"
+
+    - name: Display Web Connectivity Results
+      ansible.builtin.debug:
+         msg: "{{ item.content | trim }}"
+      loop: "{{ web_check_result.results }}"
+      loop_control:
+         label: "{{ item.item }}"
