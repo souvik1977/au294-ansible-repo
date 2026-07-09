@@ -1,0 +1,18 @@
+# Condition Example 1 
+# Server Configuration
+listen 80;
+
+# Defining the protocol, log file based on enviornment 
+{% if environment == 'production' %}
+    ssl_protocols TLSv1.2 TLSv1.3;
+    access_log /var/log/nginx/prod_access.log;
+    error_log /var/log/nginx/prod_error.log;
+{% elif environment == 'staging' %}
+    ssl_protocols TLSv1.2;
+    access_log /var/log/nginx/staging_access.log;
+    error_log /var/log/nginx/staging_error.log;
+{% else %}
+    ssl_protocols TLSv1.2;
+    access_log /var/log/nginx/dev_access.log;
+    error_log /var/log/nginx/dev_error.log;
+{% endif %}

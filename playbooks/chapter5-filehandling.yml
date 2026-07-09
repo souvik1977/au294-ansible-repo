@@ -1,0 +1,72 @@
+---
+- name: File Handling Playbook
+  hosts: localhost
+  become: true
+  vars:
+    file_path: "files/vsftpd.conf"
+  tasks:
+    - name: 1 - Creating vsftpd.conf file using blockinfile module
+      ansible.builtin.blockinfile:
+          path: "{{ file_path }}"
+          state: present
+          block: |
+            # This is a sample vsftpd configuration file
+
+            # Access control settings
+            listen=NO                    # Let systemd control the socket (on RHEL/Alma)
+            anonymous_enable=YES         # Allow or Block public unauthenticated users
+            local_enable=YES             # Allow local Linux users to log in
+            write_enable=YES             # Enable write operations (uploads, delete, mkdir)
+            local_umask=022              # Default file permissions (Files: 644, Dirs: 755)
+
+            # Security & Listening settings
+            connect_from_port_20=YES      # Use standard port 20 for data connections
+            chroot_local_user=YES         # Lock users inside their own home directory
+            allow_writeable_chroot=YES    # Required for modern Linux if home dir has write access
+
+            # Conditional and Listening profiles
+            dirmessage_enable=YES
+            xferlog_enable=YES            # Enable logging for uploads/downloads
+
+            # 4. System Environment Context
+            pam_service_name=vsftpd       # Use standard PAM authentication rules
+            userlist_enable=YES           # Enable the user exclusion list
+            tcp_wrappers=YES              # Enable TCP wrappers for network security
+          append_newline: true
+          prepend_newline: true
+          mode: '0644'
+          create: true
+      register: blockinfile_result
+
+    - name: 2 - Display the result of the blockinfile operation
+      debug:
+        msg: >
+          {{ file_path }} Created/updated successfully
+      when: blockinfile_result['changed'] == true
+
+    - name: 3 - Check if vsftpd template file present or not
+      ansible.builtin.stat:
+        path: "{{ file_path }}"
+      register: vsftpd_file_stat
+
+    - name: 4 - Template file exists
+      ansible.builtin.debug:
+        msg: >
+          VSFTPD template file exits
+          Location and name {{file_path }}
+      when: vsftpd_file_stat.stat is defined
+
+    - name: 4 - Template file doest not exists
+      ansible.builtin.debug:
+        msg: >
+          VSFTPD template file not exists in
+          Location and name {{file_path }}
+      when: vsftpd_file_stat.stat is not defined
+
+    - name: 5 - Updating 'annonymous_enabled' line
+      ansible.builtin.lineinfile:
+        path: "{{ file_path }}"
+        regexp: '^(anonymous_enable\s*=\s*)YES(\s*#.*)$'
+        line: '\1NO\2'
+        backrefs: true
+      when: vsftpd_file_stat.stat is defined

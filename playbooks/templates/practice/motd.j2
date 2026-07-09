@@ -1,0 +1,11 @@
+This system {{ ansible_facts['fqdn'] }} running on {{ ansible_facts['distribution'] }} 
+{{ ansible_facts['distribution_version'] }} system. 
+Unauthorized access is prohibited.
+{% if ansible_facts['fqdn'] in groups['webservers'] %}
+This system is a web server. Please contact the web team for any issues.
+{% elif ansible_facts['fqdn'] in groups['dbservers'] %}
+This system is a database server. Please contact the database team for any issues.
+{% else %}
+This system is not classified as a web or database server. 
+Please contact: {{ system_owner }} for any issues.
+{% endif %}

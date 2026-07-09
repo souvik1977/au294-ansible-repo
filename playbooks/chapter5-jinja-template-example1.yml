@@ -1,0 +1,14 @@
+---
+- name: Testing Jinja2 Templating
+  hosts: all:!balancer
+  become: true
+  vars:
+    maintainer: 'sdhar.aws.78@gmail.com'
+  tasks:
+    - name: Updating /etc/motd on remote servers
+      ansible.builtin.template:
+        src: templates/motd2.j2
+        dest: /etc/motd
+        owner: root
+        group: root
+        mode: '0644'

@@ -1,0 +1,13 @@
+=====================================================================================================
+   WARNING: Authorized Access Only on {{ ansible_facts['fqdn'] | upper }} 
+======================================================================================================
+
+Operating System: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
+Kernel Version: {{ ansible_facts['kernel'] }}
+Total Memory: {{ ansible_facts['memtotal_mb'] / 1024 | round(1) }} GB
+
+This system is managed automatically by Ansible.
+Maintainer: {{ maintainer }}
+Last policy sync deplyment: {{ ansible_facts['date_time']['date'] }} 
+
+=======================================================================================================

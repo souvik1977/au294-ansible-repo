@@ -1,0 +1,41 @@
+# Main Context (Global Settings)
+user nginx;
+worker_processes auto;
+# Defining the log file based on environment variable 
+
+{% if env == 'production' %}
+error_log /var/log/nginx/prod_error.log warn;
+access_log /var/log/nginx/prod_access.log;
+{% else%}
+error_log /var/log/nginx/nonprod_error.log warn;
+access_log /var/log/nginx/nonprod_access.log;
+{% endif %}
+
+pid /var/run/nginx.pid;
+
+# Connection handling settings
+events {
+    worker_connections 1024;
+}
+
+# HTTP server configuration
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream; 
+
+    # Performance tuning settings
+    sendfile        on;
+    keepalive_timeout  65;
+
+    # Server block configuration
+    server {
+        listen       80;
+        server_name  {{ server_name }};
+
+        # Location block for serving static files
+        location / {
+            root   {{ document_root }};
+            index  index.html index.htm;
+        }
+    }
+}
