@@ -1,0 +1,1 @@
+/var/nfs_share   10.10.1.0/24(rw,sync,no_subtree_check,no_root_squash)

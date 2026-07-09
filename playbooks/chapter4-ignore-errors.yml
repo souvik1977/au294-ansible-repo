@@ -1,0 +1,39 @@
+---
+- name: Testing Task Failure
+  hosts: test
+  become: true
+  force_handlers: true
+  vars:
+    required_package: vim-X11
+    optional_package: vlc
+  tasks:
+    - name: Copy motd to the remote server
+      ansible.builtin.copy:
+        src: files/motd.txt
+        dest: /etc/motd
+        mode: '0644'
+        owner: root
+        group: root
+      notify: Log MOTD Update
+
+    - name: Install required package
+      ansible.builtin.dnf:
+        name: "{{ required_package }}"
+        state: present
+
+    - name: Install optional package
+      ansible.builtin.dnf:
+        name: "{{ optional_package }}"
+        state: present
+
+
+  handlers:
+    - name: Log MOTD Update
+      ansible.builtin.lineinfile:
+        path: /var/log/motd_changes.log
+        state: present
+        create: yes
+        mode: '0644'
+        owner: root
+        group: root
+        line: "MOTD Updated on {{ ansible_facts['date_time']['date'] }} at {{ ansible_facts['date_time']['time'] }} "

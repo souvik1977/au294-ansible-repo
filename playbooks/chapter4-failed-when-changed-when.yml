@@ -1,0 +1,77 @@
+# Failed_when: by default, Ansible will mark a task if it returns non-zero exit code as failed. 
+# However, you can use the `failed_when` directive to override this behavior and specify 
+# conditions under which a task should be considered failed.
+
+# changed_when: By default, Ansible will mark a task as changed if it makes any changes to the target 
+# system. using 'changed_when' directive, you can override this behavior and specify conditions 
+# under which a task should be considered changed. It accepts boolean values 'true' or 'false'.
+
+---
+- name: Example of failed_when and changed_when
+  hosts: localhost
+  tasks:
+    # Example 1: when we are overriding a false "Failure"
+    - name: Run app status tool (Returns exit code 2, but we would not consider that as failure)
+      ansible.builtin.shell: |
+        echo "STATUS: Application is currently stopped"
+        exit 2
+      register: app_status
+      failed_when: "'CRITICAL' in app_status.stdout"
+      changed_when: false
+
+    - name: Record failure status
+      ansible.builtin.set_fact:
+        health_check_failed: "{{ 'CRITICAL' in app_status.stdout }}"
+
+    - name: Showing App status - Ok
+      ansible.builtin.debug:
+        msg: "Application is Ok"
+      when: not health_check_failed | bool
+
+
+    - name: Showing App status - Error
+      ansible.builtin.debug:
+        msg: "Application has issue"
+      when: health_check_failed | bool
+
+    # Example 2: when we are overriding a false "Change" - failed_when
+    - name: Run database check (Returns exit code 0, but output shows it failed)
+      ansible.builtin.shell: |
+        echo "ERROR: Connection timeout to database cluster"
+        exit 0
+      register: db_check
+      failed_when: "'ERROR' in db_check.stdout"
+      ignore_errors: true
+
+    - name: Display DB Check Status - Ok
+      ansible.builtin.debug:
+        msg: "DB is running fine"
+      when: "'ERROR' not in db_check.stdout"
+
+    - name: Display DB Check Status - Error
+      ansible.builtin.debug:
+        msg: "DB Connection error"
+      when: "'ERROR' in db_check.stdout"
+
+
+    # Example 3: Capturing actual changed_when condition
+    - name: Run configuration sync tool
+      ansible.builtin.shell: |
+        echo "Sync completed. 5 files updated."
+      register: sync_result
+      changed_when: "'0 files updated' not in sync_result.stdout"
+
+    - name: Capture sync status
+      ansible.builtin.set_fact:
+        sync_stat: "Sync-Ok"
+      when: "'0 files updated' not in sync_result.stdout"
+
+    - name: Displaying sync status - Ok
+      ansible.builtin.debug:
+        msg: "Sync Completed Successfully"
+      when: not sync_stat | bool
+
+    - name: Displaying sync status - Issue
+      ansible.builtin.debug:
+        msg: "Sync was not completed successfully"
+      when: sync_stat | bool

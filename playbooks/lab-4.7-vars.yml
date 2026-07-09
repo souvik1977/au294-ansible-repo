@@ -1,0 +1,19 @@
+# Defining minimum memory requirement for nfs server configuration
+nfs_min_ram_mb: 1500
+
+# Defining nfs packages:
+nfs_packages:
+  - nfs-utils
+  - nfs4-acl-tools
+  - policycoreutils-python-utils
+
+nfs_services:
+  - nfs-server
+nfs_directories: 
+ - /var/nfs_share
+exports_file: files/exports
+firewall_nfs_service: 
+  - nfs
+  - mountd
+  - rpc-bind
+selinux_context: public_content_rw_t

@@ -1,0 +1,154 @@
+---
+- name: Configure NFS
+  hosts: dev
+  become: true
+  become_user: root
+  become_method: sudo
+  vars_files:
+    - vars/lab-4.7-vars.yml
+  tasks:
+    # Fail fast message
+    - name: Show Fail Message if Memory requirements are not met
+      ansible.builtin.fail:
+        msg: "This System Does not fulfil the memory requirement to configure NFS Server"
+      when:
+        - ansible_facts['memtotal_mb']  <  nfs_min_ram_mb
+        - ansible_facts['os_family'] == 'RedHat'
+
+    - name: 1 - Gather installed package details
+      ansible.builtin.package_facts:
+        manager: auto
+      check_mode: false
+
+    # Check if firewall package is installed or not
+    - name: 2 - Check-Install-Start firewalld service if not installed already
+      block:
+
+        - name: 2.1 - Check if firewalld package is installed
+          ansible.builtin.set_fact:
+              firewalld_package_state: "installed"
+          when: "'firewalld' in ansible_facts.packages"
+
+        - name: 2.2 - Installing firewalld if not installed
+          ansible.builtin.dnf:
+            name: firewalld
+            state: present
+          when: firewalld_package_state is not defined
+
+        - name: 2.3 - Start firewalld service
+          ansible.builtin.systemd_service:
+            name: firewalld
+            state: started
+            enabled: true
+            masked: false
+
+    # Install all NFS packages
+    - name: 3.1 - Install required packages
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ nfs_packages }}"
+      register: install_task_state
+
+    - name: 3.2 - Starting NFS Services
+      ansible.builtin.systemd_service:
+         name: "{{ item }}"
+         enabled: true
+         masked: false
+         state: started
+      loop: "{{ nfs_services }}"
+
+    # Capturing SELinux State
+    - name: 3.2 - Capturing SELinux State on the server
+      ansible.builtin.set_fact:
+        initial_selinux_mode: "{{ (ansible_facts['selinux'] | default({})).mode | default('disabled') }}"
+
+    - name: 3.3 - Displaying SELinux state
+      ansible.builtin.debug:
+        msg: "SELinux State on {{ ansible_facts['fqdn'] }} => {{ ansible_facts['selinux']['mode'] }}"
+
+    # Create NFS Share
+    - name: 4 - Create NFS Share and configure NFS Exports over firewall and setting SELinux context
+      block:
+        - name: 4.1 - Create NFS Share directory
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            owner: nobody
+            group: nobody
+            mode: '0777'
+          loop: "{{ nfs_directories }}"
+
+        - name: 4.2 - Copy NFS Exports file to the remote server
+          ansible.builtin.copy:
+            src: "{{ exports_file }}"
+            dest: /etc/exports
+            mode: '0644'
+            owner: root
+            group: root
+
+        - name: 4.3 - Setting SELinux context on NFS Shares if SELinux is permissive or enforcing
+          community.general.sefcontext:
+            target: "{{ item }}/(/.*)?"
+            setype: "{{ selinux_context }}"
+            state: present
+          register: selinux_dir_context
+          loop: "{{ nfs_directories }}"
+          when: initial_selinux_mode.lower() in ['permissive', 'enforcing']
+
+
+        - name: 4.4 - Enforcing SELinux context
+          ansible.builtin.command: restorecon -Rv {{ item }}
+          when: selinux_dir_context.changed
+          loop: "{{ nfs_directories }}"
+
+        - name: 4.5 - Allowing NFS Service over firewalld
+          ansible.posix.firewalld:
+            service: "{{ item }}"
+            permanent: true
+            immediate: true
+            state: enabled
+          loop: "{{ firewall_nfs_service }}"
+
+    # Verify Exports
+    - name: 5 - Verify Exports
+      block:
+        - name: 5.1 - Executing exportfs command to see if NFS shares are visible
+          ansible.builtin.command:
+            cmd: exportfs -v
+          register: nfs_exportfs_result
+          changed_when: false
+
+        - name: 5.2 - Fail if exportfs does not contain target directories
+          ansible.builtin.debug:
+            msg: "The shares {{ item }} is not currently exported. "
+          when: item  not in nfs_exportfs_result['stdout']
+          loop: "{{ nfs_directories }}"
+
+        - name: 5.3 - Success if exportfs does contain target directories
+          ansible.builtin.debug:
+            msg:
+              The shares are currently exported
+              {{ item }}
+          loop: "{{ nfs_directories }}"
+          when: item in nfs_exportfs_result['stdout']
+
+      rescue:
+        - name: Notify about missing shares
+          ansible.builtin.debug:
+            msg: >
+              One or more exports are were not
+              configured, NFS services will
+              be restarted.
+          changed_when: true
+          notify: Start and enable services
+
+  handlers:
+    # Enable NFS Services
+    - name: Start and enable services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        masked: false
+        state: restarted
+      loop: "{{ nfs_services }}"
