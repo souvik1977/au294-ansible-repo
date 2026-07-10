@@ -15,7 +15,11 @@ pid /var/run/nginx.pid;
 
 # Connection handling settings
 events {
+    {% if ansible_facts['memtotal_mb'] > 8192 %}
+    worker_connections 4096;
+    {% else %}
     worker_connections 1024;
+    {% endif %}
 }
 
 # HTTP server configuration

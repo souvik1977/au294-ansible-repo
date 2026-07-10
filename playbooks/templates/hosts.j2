@@ -1,0 +1,13 @@
+## /etc/hosts file maintained by Ansible
+# For historical reasons, localhost precedes localhost.localdomain:
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+{% for host in internal_network_nodes -%}
+{% if host.role == 'loadbalancer' or host.role == 'database' -%}
+{{ host.ip_address }}   {{ host.hostname }}.{{ host.role }}.local {{ host.hostname }} # CRITICAL CORE HOST
+{% else -%}
+{{ host.ip_address }}   {{ host.hostname }}.{{ host.role }}.local {{ host.hostname }}
+{% endif -%}
+{% endfor -%}
+

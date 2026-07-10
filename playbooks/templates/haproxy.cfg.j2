@@ -1,0 +1,51 @@
+# Global settings for the HAProxy process
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    chroot /var/lib/haproxy
+    user haproxy
+    group haproxy
+    daemon
+
+    # Maximum concurrent connections globally
+    maxconn 4096
+
+# Default parameters shared across frontend and backend blocks
+defaults
+    log     global
+    mode    http
+    option  httplog
+    option  dontlognull
+    retries 3
+    
+    # Timeout settings
+    timeout connect 5000ms
+    timeout client  50000ms
+    timeout server  50000ms
+
+# Public-facing traffic handler
+frontend http_in
+    bind *:80
+    
+    # Captures the client's real IP address
+    option forwardfor
+    
+    # Routes all traffic to the app_cluster backend
+    default_backend app_cluster
+
+# Backend servers handling the routed traffic
+backend dynamic_web_pool
+    # Load balancing algorithm (alternates between servers)
+    balance roundrobin
+    
+    # Automated health checks look for successful HTTP responses
+    option httpchk GET /health
+
+    # Backend server pool with active health monitoring
+    {% for server in groups['webserver'] -%}
+    {% if hostvars[server]['ansible_facts']['hostname'] == 'serverB' -%}
+    server {{ hostvars[server]['ansible_facts']['hostname'] | default(server.split('.')[0]) }} {{ hostvars[server]['default_ipv4']['address'] | default(server)}}:8080 check maxconn 100 
+    {% else -%}
+    server {{ hostvars[server]['ansible_facts']['hostname'] | default(server.split('.')[0]) }} {{ hostvars[server]['default_ipv4']['address'] | default(server)}}:8080 check
+    {% endif -%}
+    {% endfor -%}
