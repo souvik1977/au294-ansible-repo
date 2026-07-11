@@ -1,0 +1,11 @@
+---
+- name: Installing {{ package }}
+  ansible.builtin.dnf:
+    name: "{{ package }}"
+    state: present
+
+- name: Starting {{ service }}
+  ansible.builtin.systemd_service:
+    name: "{{ service }}"
+    state: started
+    enabled: yes

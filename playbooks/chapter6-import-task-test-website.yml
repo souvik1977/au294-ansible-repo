@@ -1,0 +1,27 @@
+---
+- name: Test Web Service
+  hosts: test
+  become: false
+  vars:
+    web_user: guest
+  vars_files:
+    - vars/secret.yml
+  tasks:
+    - name: Test Web Services
+      ansible.builtin.uri:
+        url: http://{{ item }}
+        validate_certs: false
+        force_basic_auth: true
+        user: "{{ web_user }}"
+        password: "{{ web_pass }}"
+        return_content: true
+        status_code: 200
+      register: auth_test
+      loop: "{{ web_servers }}"
+
+    - name: Display Test Results
+      ansible.builtin.debug:
+        msg: "{{ item.content | trim }}"
+      loop: "{{ auth_test.results }}"
+      loop_control:
+        label: "{{ item.item }}"

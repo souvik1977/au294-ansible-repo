@@ -1,0 +1,28 @@
+---
+- name: Import Tasks Demo
+  hosts: webserver
+  become: true
+  vars:
+    package: httpd
+    service: httpd
+    firewall_pkg: firewalld
+    firewall_svc: firewalld
+    rule:
+      - http
+      - https
+    file: /var/www/html/index.html
+
+  tasks:
+    - name: Installing Web Packages
+      ansible.builtin.include_tasks: tasks/environment.yml
+
+    - name: Installing Firewall Package and Enable it
+      ansible.builtin.include_tasks: tasks/firewall.yml
+
+    - name: Configuring Web Page
+      ansible.builtin.include_tasks: tasks/placeholder.yml
+
+- name: Test WebServers
+  ansible.builtin.import_playbook: chapter6-import-task-test-website.yml
+  vars:
+    web_servers: "{{ groups['webserver'] }}"
