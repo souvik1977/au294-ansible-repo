@@ -4,7 +4,7 @@ In this play we will configure vsftp service with TLS/SSL using ansible role.
 We will follow certin steps to complete the whole task. Few of those actions need to be done on the ansible controller node.
 For those actions/tasks we will specify [controller] for easy understanding.
 
-- we are going to use 'block', 'pre_tasks' , 'post_tasks' into thos playbook along with jinja2 templating to make it production ready and robust.
+- we are going to use 'block', 'pre_tasks' , 'post_tasks' into this playbook along with jinja2 templating to make it production ready and robust.
 
 ## 1 - Creating 'roles' directory and updating '$HOME/ansible/ansible.cfg' [controller]
 
