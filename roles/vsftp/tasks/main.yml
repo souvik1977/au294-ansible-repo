@@ -1,0 +1,114 @@
+- name: Install Packages
+  ansible.builtin.dnf:
+    name:
+      - "{{ ftp_pkg }}"
+      - "{{ ssl_package }}"
+    state: present
+
+- name: Copying SSL configuration template
+  ansible.builtin.template:
+    src: ssl.cnf.j2
+    dest: /etc/ssl/vsftpd.cnf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Generating SSL certificate
+  ansible.builtin.command:
+    cmd: >
+         openssl req -x509 -nodes -days 365 -newkey rsa:2048
+         -keyout /etc/pki/tls/private/vsftpd.key
+         -out /etc/pki/tls/certs/vsftpd.crt
+         -config /etc/ssl/vsftpd.cnf
+    creates: /etc/pki/tls/certs/vsftpd.crt
+
+- name: Check if vsftpd.key file exists
+  ansible.builtin.stat:
+    path: /etc/pki/tls/private/vsftpd.key
+  register: vsftpd_key_exists
+
+- name: Change permissions of vsftpd.key file
+  ansible.builtin.file:
+    path: /etc/pki/tls/private/vsftpd.key
+    owner: root
+    group: root
+    mode: '0600'
+  when: vsftpd_key_exists.stat.exists
+
+- name: Check if vsftpd.crt file exists
+  ansible.builtin.stat:
+    path: /etc/pki/tls/certs/vsftpd.crt
+  register: vsftpd_crt_exists
+
+- name: Change permissions of vsftpd.crt file
+  ansible.builtin.file:
+    path: /etc/pki/tls/certs/vsftpd.crt
+    owner: root
+    group: root
+    mode: '0644'
+  when: vsftpd_crt_exists.stat.exists
+
+- name: Copying vsftpd configuration template
+  ansible.builtin.template:
+    src: vsftpd.conf.j2
+    dest: /etc/vsftpd/vsftpd.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart vsftpd service
+
+
+- name: Copying vsftpd user list template
+  ansible.builtin.copy:
+    src: vsftpd.user_list
+    dest: /etc/vsftpd/user_list
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Creating vsftpd log file
+  ansible.builtin.file:
+    path: /var/log/vsftpd.log
+    state: touch
+    owner: root
+    group: root
+    mode: '0644'
+    modification_time: preserve
+    access_time: preserve
+
+- name: Restore SELinux context on log file path
+  ansible.builtin.command: restorecon -v /var/log/vsftpd.log
+
+
+- name: Create FTP user
+  ansible.builtin.user:
+    name: "{{ ftp_user }}"
+    password: "{{ ftp_password  }}"
+    state: present
+
+- name: Configure SELinux to allow FTP
+  ansible.posix.seboolean:
+    name: allow_ftpd_full_access
+    state: yes
+    persistent: yes
+
+- name: Allowing FTP service through the firewall
+  ansible.posix.firewalld:
+    service: ftp
+    permanent: yes
+    state: enabled
+    immediate: yes
+
+- name: Allowing FTP Port Range through the firewall
+  ansible.posix.firewalld:
+    port: "{{ ftp_port_ranges }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+
+- name: Start and enable vsftpd service
+  ansible.builtin.systemd_service:
+    name: "{{ ftp_svc }}"
+    state: started
+    enabled: yes

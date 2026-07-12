@@ -1,0 +1,6 @@
+ftp_user: devapp1
+ftp_password: '<YOUR_HASHED_PASSWORD>'
+ftp_pkg: vsftpd
+ftp_svc: vsftpd
+ssl_package: openssl
+ftp_port_ranges: 30000-31000/tcp

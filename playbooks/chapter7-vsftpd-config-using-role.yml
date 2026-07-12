@@ -1,0 +1,97 @@
+---
+- name: Play 1 - Configure vsftpd using Ansible role
+  hosts: dev
+  become: yes
+  vars:
+    firewalld_pkg: firewalld
+    firewalld_svc: firewalld
+  pre_tasks:
+    - name: Install firewalld package
+      ansible.builtin.dnf:
+        name: "{{ firewalld_pkg }}"
+        state: present
+
+    - name: Start and enable firewalld service
+      ansible.builtin.systemd_service:
+        name: "{{ firewalld_svc }}"
+        state: started
+        enabled: yes
+  roles:
+    - role: vsftpd
+
+  post_tasks:
+    - name: Check if vsftpd service status
+      ansible.builtin.service:
+        name: "{{ ftp_svc }}"
+        state: started
+      check_mode: yes
+      register: ftp_service_status_check
+
+    - name: Evaluate Service Status and setting up testing context
+      block:
+         - name: Showing if vsftp service status
+           ansible.builtin.debug:
+              msg: "vsftpd service is RUNNING on the remote server {{ inventory_hostname }}"
+
+
+         - name: Setting up ftp_server_ip
+           ansible.builtin.set_fact:
+               vsftpd_server_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
+
+      when: not ftp_service_status_check.changed
+
+    - name: Handled Stopped service flow
+      block:
+         - name: Showing if vsftp service status
+           ansible.builtin.debug:
+              msg: "vsftpd service is NOT RUNNING on the remote server {{ inventory_hostname }}"
+
+         - name: Stop Test VSFTP Execution if vsftpd is down
+           ansible.builtin.meta: end_play
+
+      when: ftp_service_status_check.changed
+
+
+- name: Play 2 - Testing vsftp from other server
+  hosts: sandbox
+  become: yes
+
+  vars:
+    ftp_server: "{{ hostvars[groups['dev'][0]]['vsftpd_server_ip'] }}"
+  tasks:
+    - name: Test Control Channel Connectivity (Port 21)
+      ansible.builtin.wait_for:
+        host: "{{ ftp_server }}"
+        port: 21
+        timeout: 10
+        state: started
+      register: ftp_control_channel_state
+
+    - name: Print control channel connectivity result
+      ansible.builtin.debug:
+        msg: "Control channel connectivity to {{ ftp_server }} on port 21 is open."
+      when: ftp_control_channel_state is succeeded
+
+    - name: Print control channel connectivity result
+      ansible.builtin.debug:
+        msg: "Control channel connectivity to {{ ftp_server }} on port 21 is not open."
+      when: ftp_control_channel_state is failed
+
+    - name: Test Data Channel Connectivity (port 30000)
+      ansible.builtin.wait_for:
+        host: "{{ ftp_server }}"
+        port: 30000
+        timeout: 10
+        state: stopped
+      register: ftp_data_channel_state
+
+    - name: Print data channel connectivity result
+      ansible.builtin.debug:
+        msg: "Data channel connectivity to {{ ftp_server }} on port 30000 is open."
+      when: ftp_data_channel_state is succeeded
+
+    - name: Print data channel connectivity result
+      ansible.builtin.debug:
+        msg: "Data channel connectivity to {{ ftp_server }} on port 30000 is not open."
+      when: ftp_data_channel_state is failed
+
