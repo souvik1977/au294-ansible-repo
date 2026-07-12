@@ -19,21 +19,33 @@ roles_path = /home/devops/ansible/roles
 Your 'ansible.cfg' will looks like:
 
 [defaults]
+
 inventory = inventory
+
 host_key_checking = false
+
 remote_user = devops
+
 forks = 10
+
 private_key_file = /home/devops/.ssh/controller-key
+
 collections_path = /home/devops/ansible/collections:/usr/share/ansible/collections
+
 roles_path = /home/devops/ansible/roles
 
 [privileged_escalation]
+
 become = True
+
 become_user = root
+
 become_method = sudo
+
 become_ask_pass = False
 
 [inventory]
+
 ansible_plugins = community.general.nmap
 
 ## 2 - Creating a role named 'vsftp' inside the 'roles' directory
