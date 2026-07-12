@@ -163,18 +163,31 @@ lftp -c "
 On successful upload you should see below logs in "/var/log/vsftpd.log":
 
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP response: Client "10.10.1.100", "230 Login successful."
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP command: Client "10.10.1.100", "PWD"
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP response: Client "10.10.1.100", "257 "/" is the current directory"
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP command: Client "10.10.1.100", "PBSZ 0"
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP response: Client "10.10.1.100", "200 PBSZ set to 0."
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP command: Client "10.10.1.100", "PROT P"
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP response: Client "10.10.1.100", "200 PROT now Private."
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP command: Client "10.10.1.100", "TYPE I"
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP response: Client "10.10.1.100", "200 Switching to Binary mode."
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP command: Client "10.10.1.100", "PASV"
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP response: Client "10.10.1.100", "227 Entering Passive Mode (10,10,1,30,117,67)."
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP command: Client "10.10.1.100", "STOR testfile.txt"
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] FTP response: Client "10.10.1.100", "150 Ok to send data."
+
 Sun Jul 12 14:52:10 2026 [pid 81233] [devapp1] OK UPLOAD: Client "10.10.1.100", "/testfile.txt", 45 bytes, 0.77Kbyte/sec
 
 Some descriptions:
