@@ -16,6 +16,26 @@ Updating 'ansible.cfg' with role path: vim $HOME/ansible/ansible.cfg
 
 roles_path = /home/devops/ansible/roles
 
+Your 'ansible.cfg' will looks like:
+
+[defaults]
+inventory = inventory
+host_key_checking = false
+remote_user = devops
+forks = 10
+private_key_file = /home/devops/.ssh/controller-key
+collections_path = /home/devops/ansible/collections:/usr/share/ansible/collections
+roles_path = /home/devops/ansible/roles
+
+[privileged_escalation]
+become = True
+become_user = root
+become_method = sudo
+become_ask_pass = False
+
+[inventory]
+ansible_plugins = community.general.nmap
+
 ## 2 - Creating a role named 'vsftp' inside the 'roles' directory
 
 ansible-galaxy role init roles/vsftp
@@ -38,6 +58,8 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout /etc/pki/tls/private/vsftpd.key \
   -out /etc/pki/tls/certs/vsftpd.crt \
   -config /etc/ssl/vsftpd.cnf
+
+[Note:] You do not need to execute above command anywhere as it will be executed by the role to generate self-signed certificates in idempotent way.
 
 We will configure our vsftpd.cnf.j2 to provide our server FQDN and IPv4 address through ansible_fats.
 
