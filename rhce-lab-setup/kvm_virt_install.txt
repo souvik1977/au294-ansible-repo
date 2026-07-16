@@ -1,0 +1,163 @@
+sudo virt-install \
+  --name nfs-server \
+  --memory 2048 \
+  --vcpus 1 \
+  --disk size=20,format=qcow2 \
+  --disk path=/var/lib/libvirt/images/host1-data1.raw,format=raw,bus=virtio \
+  --os-variant almalinux10 \
+  --cdrom /tmp/AlmaLinux-10.1-x86_64-dvd.iso \
+  --network network=default,model=virtio \
+  --network network=host-only,model=virtio \
+  --graphics vnc
+
+
+
+sudo virt-install \
+  --name nfs-server \
+  --memory 2048 \
+  --vcpus 1 \
+  --disk size=15,format=qcow2 \
+  --os-variant almalinux10 \
+  --cdrom /tmp/AlmaLinux-10.1-x86_64-dvd.iso \
+  --network network=default,model=virtio \
+  --graphics vnc \
+  --noautoconsole \
+  --wait 0
+
+
+#Creating the kvm-base machine:
+1. Create a 100GB root disk:
+#virsh vol-create-as --pool default --name kvmbase-root-disk.qcow2 --format qcow2 --capacity 100
+
+2. Create the VM:
+#virt-install --name kvm-base.domain24.example.net --os-variant almalinux10 --vcpu 2 --memory 10240 --disk path=/kvm-storage/images/kvmbase-root-disk.qcow2,size=100,format=qcow2 --graphics=vnc --cdrom /ISOFiles/AlmaLinux-10.1-x86_64-dvd.iso --noautoconsole
+
+
+
+#Create pxe-server
+1. Create a 100GB root disk:
+#virsh vol-create-as --pool default --name pxeserver-root-disk.qcow2 --format qcow2 --capacity 30G
+
+2. Create the VM:
+#virt-install --name pxe-server.domain24.example.net --os-variant almalinux10 --vcpu 2 --memory 4096 --disk path=/kvm-storage/images/pxeserver-root-disk.qcow2,size=30,format=qcow2 --network network=host-only,model=virtio --graphics=vnc --cdrom /ISOFiles/AlmaLinux-10.1-x86_64-dvd.iso --noautoconsole
+
+
+Creating VM's for RHCE:
+
+
+Post VM Build Modify the RAM and all:
+# read -p "Enter Hostname :" mHost
+short_name=$(echo $mHost | cut -d'.' -f1)
+#virsh vol-create-as --pool default --name $short_name-root.qcow2 --format qcow2 --capacity 15G
+#virt-install --name $mHost  --vcpus 2  --memory 4096  --cpu host-passthrough  --disk path=/kvm-storage/images/$short_name-root.qcow2,size=15,format=qcow2 --network network=host-only,model=virtio  --os-variant  almalinux10  --boot network,hd,useserial=on --graphics none
+# virsh destroy $mHost
+# virsh setmaxmem $mHost 2048M --config   [KiB: 2097152]
+# virsh setmem $mHost 2048M --config
+# virsh setvcpus --count 1 --domain $mHost --maximum --config
+
+Remove the netboot:
+# virsh edit $mHost
+
+Remove the line under <os></os>:
+<boot dev='network'/>
+or
+#virsh dumpxml $mHost | sed "/<boot dev='network'\/>/d" | virsh define /dev/stdin
+
+# virsh dumpxml serverD.domain24.example.net | sed "/<boot dev='network'\/>/d" | virsh define /dev/stdin
+virsh attach-interface --domain $mHost --source default --target enp9s0 --model virtio --managed --live --config --type network
+
+Managing Hosts:
+HOSTS=$(virsh list --all | awk -F' ' 'NR>2 {print $2}')
+for host in ${HOSTS[@]}; do virsh shutdown $host; done
+
+Starting up:
+HOSTS=$(virsh list --all | awk -F' ' 'NR>2 {print $2}')
+for host in ${HOSTS[@]}
+do
+if [ $host == 'pxe-server.domain24.example.net' ]
+then
+continue
+else
+virsh start $host
+fi
+done
+
+
+Stopping:
+HOSTS=$(virsh list --all | awk -F' ' 'NR>2 {print $2}')
+for host in ${HOSTS[@]}
+do
+if [ $host == 'pxe-server.domain24.example.net' ]
+then
+continue
+else
+virsh stop $host
+fi
+done
+
+
+
+## Creating a VM with existing root disk
+Step-1
+
+
+NEW_MAC=$(printf '52:54:00:%02x:%02x:%02x\n' $[RANDOM%256] $[RANDOM%256] $[RANDOM%256])
+
+# 2. Print it to your screen so you have a copy of it
+echo "Your new VM MAC address is: $NEW_MAC"
+
+# 3. Register this MAC to your 10.10.1.100 IP in the default network
+sudo virsh net-update default add ip-dhcp-host \
+  "<host mac='$NEW_MAC' ip='10.10.1.100'/>" \
+  --live --config
+
+# Building the VM:
+
+sudo virt-install \
+  --name controller.lab.example.com \
+  --ram 2048 \
+  --vcpus 2 \
+  --os-variant almalinux10 \
+  --disk path=/kvm-storage/images/controller-root.qcow2,format=qcow2 \
+  --network network=default,mac=$NEW_MAC \
+  --network network=host-only \
+  --import \
+  --noautoconsole
+
+
+Updating the network profile with new MAC address post rebuild:
+Step-1: virsh console <VM_Name>
+
+Step-2: ip link show   # To get the new MAC address 
+
+Step-3: vim /etc/NetworkManager/system-connections/enp1s0.nmconnection
+
+[ethernet]
+mac-address=<YOUR_NEW_MAC>
+
+Step-4:
+
+refresh the NetworkManager connections
+
+nmcli connection down enp1s0
+
+
+nmcli connection up enp1s0
+
+
+Validation commands:
+  virsh list --all
+  virsh net-dhcp-leases host-only
+  virsh domiflist node<N>.lab.example.com
+  ssh root@10.10.1.<LAST_OCTET> hostname -f
+
+
+
+Adding DHCP reservation manually:
+
+virsh net-update host-only \
+add-last ip-dhcp-host \
+"<host mac='52:54:00:0c:9b:6a' name='node4.lab.example.com' ip='10.10.1.23'/>" \
+--live \
+--config \
+--parent-index 0
