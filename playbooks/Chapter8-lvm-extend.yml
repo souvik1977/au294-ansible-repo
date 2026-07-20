@@ -1,0 +1,48 @@
+---
+- name: Extending Logical Volume
+  hosts: "{{ targets }}"
+  become: true
+  become_user: root
+  become_method: ansible.builtin.sudo
+  vars:
+    target_disk: "/dev/vdb"
+  tasks:
+    - name: Collecting Existing LVM Volumes - Pre
+      ansible.builtin.shell: lvs -a --options name,vgname,size | awk -F' ' 'NR>1 {print $1,"=>",$2,"=>",$3}'
+      register: lvm_details
+      changed_when: false
+    
+    - name: Display Existing LVM Volumes - Pre
+      ansible.builtin.debug:
+         msg: |
+           {% for line in lvm_details.stdout_lines -%}
+           {{ line }}
+           {% endfor %}
+      
+    - name: Extending LVM
+      ansible.builtin.include_role:
+         name: redhat.rhel_system_roles.storage
+      vars:
+        storage_pools:
+           - name: app_vg
+             type: lvm
+             disks: ["{{ target_disk }}"]
+             volumes: 
+               - name: app_data_lv
+                 size: "100%"
+                 fs_type: xfs
+                 mount_point: /opt/app_data
+                 state: present
+
+    - name: Collecting Existing LVM Volumes - Post
+      ansible.builtin.shell: lvs -a --options name,vgname,size | awk -F' ' 'NR>1 {print $1,"=>",$2,"=>",$3}'
+      register: lvm_details
+      changed_when: false
+    
+    - name: Display Existing LVM Volumes - Post
+      ansible.builtin.debug:
+         msg: |
+           {% for line in lvm_details.stdout_lines -%}
+           {{ line }}
+           {% endfor %}
+

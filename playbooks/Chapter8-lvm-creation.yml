@@ -1,0 +1,26 @@
+---
+- name: Working with system-role [ storage ]
+  hosts: "{{ targets }}"
+  become: true
+
+  vars:
+    target_disk: "/dev/vdb"
+
+  tasks:
+    # =================================================================
+    # STEP 3: PROVISION VIA THE RHEL STORAGE SYSTEM ROLE (WHOLE-DISK LVM)
+    # =================================================================
+    - name: Provisioning new LVM layouts safely using System role
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.storage
+      vars:
+        storage_pools:
+          - name: app_vg
+            type: lvm
+            disks: ["{{ target_disk }}"] # Points cleanly to the raw disk target device mapping
+            volumes:
+              - name: app_data_lv
+                size: "50%"
+                fs_type: xfs
+                mount_point: /opt/app_data
+                state: present

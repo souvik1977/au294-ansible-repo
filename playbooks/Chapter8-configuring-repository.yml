@@ -1,0 +1,41 @@
+---
+- name: Configure EPEL Repository on client servers
+  hosts: "{{ targets }}"
+  become: true
+  vars:
+     custom_pkg: htop
+  tasks:
+    - name: 1 - Configure EPEL repository
+      ansible.builtin.yum_repository:
+           file: epel
+           name: epel-repo
+           description: EPEL Repository
+           baseurl: "https://dl.fedoraproject.org/pub/epel/{{ ansible_facts['distribution_major_version'] }}/Everything/{{ ansible_facts['architecture'] }}/"
+           metalink: "https://mirrors.fedoraproject.org/metalink?repo=epel-{{ ansible_facts['distribution_major_version'] }}&arch=$basearch&infra=$infra&content=$contentdir"
+           enabled: true
+           gpgcheck: true
+           gpgkey: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts['distribution_major_version'] }}"
+           state: present
+           mode: '0644'
+
+    - name: Refreshing Repo Metadata
+      ansible.builtin.shell: sudo dnf clean all && sudo dnf repolist
+
+    - name: 3 - Capturing current pacakge data
+      ansible.builtin.package_facts:
+
+    - name: 4 - Showing Package Fact for the package
+      ansible.builtin.debug:
+          msg: "Package {{ custom_pkg }} is already installed"
+      when: custom_pkg in ansible_facts['packages']
+
+    - name: 4 - Showing Package Fact for the package
+      ansible.builtin.debug:
+          msg: "Package {{ custom_pkg }} is not installed"
+      when: custom_pkg not in ansible_facts['packages']
+
+    - name: 5 - Installing Custom Package
+      ansible.builtin.dnf:
+         name: "{{ custom_pkg }}"
+         state: latest
+      when: custom_pkg not in ansible_facts['packages']

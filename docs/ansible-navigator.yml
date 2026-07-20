@@ -4,20 +4,20 @@ ansible-navigator:
   ansible:
     config:
       help: false
-      path: /home/devops/projects/ansible.cfg
+      path: /home/devops/ansible/ansible.cfg
     doc:
       help: false
       plugin:
         type: module
     inventory:
       entries:
-      - /home/devops/projects/inventory
+      - /home/devops/ansible/inventory
       help: false
     playbook:
       help: false
   ansible-builder:
     help: false
-    workdir: /home/devops/projects
+    workdir: /home/devops/ansible
   ansible-runner:
     job-events: false
   app: settings
@@ -42,14 +42,15 @@ ansible-navigator:
         dest: /runner/project
       - src: $HOME/.ssh
         dest: /home/devops/.ssh
+      - src: /usr/share/ansible/collections
+        dest: /usr/share/ansible/collections
     #image: ghcr.io/ansible/community-ansible-dev-tools:latest
-    image: my-custom-ee:latest
+    image: my-aae-ee:latest
     pull:
         policy: missing
     # ---- Add this to force the container to execute from mount -----
     container-options:
         - "--workdir=/runner/project"
-        #- "--net=host"   #[Only applicable if you are using WSL with podman]
     environment-variables:
       set:
         ANSIBLE_COLLECTIONS_PATHS: /runner/project/collections
@@ -59,7 +60,7 @@ ansible-navigator:
     - everything
   logging:
     append: true
-    file: /home/devops/projects/ansible-navigator.log
+    file: /home/devops/ansible/ansible-navigator.log
     level: warning
   mode: stdout
   playbook-artifact:

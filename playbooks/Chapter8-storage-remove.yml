@@ -1,0 +1,63 @@
+---
+- name: Working with system-role [ storage ]
+  hosts: "{{ targets }}"
+  become: true
+
+  vars:
+    target_disk: "/dev/vdb"
+
+  tasks:
+    # =================================================================
+    # STEP 1: GATHER SYSTEM MOUNTS SAFELY
+    # =================================================================
+    - name: Gather active system mount points
+      ansible.builtin.setup:
+        filter: ansible_mounts
+    
+    # =================================================================
+    # STEP 2: DYNAMIC PRE-CLEANUP & UNMOUNT BLOCK
+    # =================================================================
+    - name: Dynamically unmount any active folder paths linked to target storage disk
+      ansible.posix.mount:
+        path: "{{ item.mount }}"
+        state: unmounted
+      loop: "{{ ansible_facts['mounts'] }}"
+      when: >
+        (target_disk in item.device) or 
+        ("app_vg" in item.device) or
+        (item.mount == "/opt/app_data")
+    
+    - name: Clean up lingering stale fstab records for the target mount point
+      ansible.posix.mount:
+        path: /opt/app_data
+        state: absent
+
+    - name: Query existing volume group mapping on the target disk
+      ansible.builtin.shell: "pvs --noheadings -o vg_name {{ target_disk }}* 2>/dev/null | tr -d ' ' | sort -u | head -n 1"
+      register: discovered_vg_output
+      changed_when: false
+      failed_when: false
+    
+    - name: Dynamically destroy discovered Volume Group if present
+      ansible.builtin.command: "vgremove -y -f {{ discovered_vg_output.stdout }}"
+      when:
+        - discovered_vg_output.stdout | length > 0
+        - discovered_vg_output.stdout != ""
+      failed_when: "discovered_vg_output.stdout in ['rhel', 'cs_almalinux', 'root_vg', 'almalinux']"
+
+    - name: Register the target disk in the LVM trusted system devices file
+      ansible.builtin.command: "lvmdevices --adddev {{ target_disk }}"
+      changed_when: true
+      failed_when: false
+    
+    - name: Completely wipe raw disk metadata signature and headers
+      ansible.builtin.command: "pvremove -y -f -f {{ target_disk }}"
+      when: 
+        - discovered_vg_output.stdout | length > 0
+        - discovered_vg_output.stdout != ""
+      failed_when: false
+      changed_when: true
+
+    - name: Use wipefs to scrub lingering block signatures completely
+      ansible.builtin.command: "wipefs -a {{ target_disk }}"
+      changed_when: true

@@ -315,7 +315,6 @@ for ((i=START_INDEX; i<=END_INDEX; i++)); do
         --memory "$INITIAL_MEMORY_MB" \
         --cpu host-passthrough \
         --disk path="$ROOT_DISK_PATH",format=qcow2,bus=virtio \
-        --disk path="$DATA_DISK_PATH",format=qcow2,bus=virtio \
         --network network="$HOST_ONLY_NET",model=virtio \
         --os-variant "$OS_VARIANT" \
         --boot network,hd,useserial=on \
@@ -359,6 +358,22 @@ for ((i=START_INDEX; i<=END_INDEX; i++)); do
     info "Removing PXE network boot entry from VM XML..."
 
     remove_network_boot_from_xml "$mHost"
+
+    
+    # -----------------------------
+    # Attach data disk as /dev/vdb
+    # -----------------------------
+    info "Attaching data disk..."
+
+    virsh attach-disk \
+        "$mHost" \
+        "$DATA_DISK_PATH" \
+        vdb \
+        --subdriver qcow2 \
+        --config
+
+    info "Data disk attached as vdb"
+
 
     # -----------------------------
     # Attach NAT network as second NIC
@@ -415,6 +430,58 @@ for ((i=START_INDEX; i<=END_INDEX; i++)); do
 
     virsh start "$mHost"
 
+
+    
+    # -----------------------------
+    # Wait for VM to come online
+    # -----------------------------
+    info "Waiting for VM networking..."
+
+    until ping -c1 -W1 "$HOST_ONLY_IP" >/dev/null 2>&1
+    do
+        sleep 5
+    done
+
+    
+    # -----------------------------
+    # Configure hostname and static IP
+    # -----------------------------
+    
+    # -----------------------------
+    # Discover actual DHCP IP
+    # -----------------------------
+     CURRENT_IP=$(
+            arp -an |
+            awk -v mac="$HOST_ONLY_MAC" '
+            BEGIN { IGNORECASE=1 }
+            index(tolower($0), tolower(mac)) {
+                gsub(/[()]/, "", $2)
+                print $2
+                exit
+            }'
+    )
+
+    if [ -z "$CURRENT_IP" ]; then
+            fail "Unable to determine DHCP address for $mHost"
+    fi
+
+    info "Current DHCP IP: $CURRENT_IP"
+
+    # -----------------------------
+    # Configure hostname and static IP
+    # -----------------------------
+    ssh -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            student@"$CURRENT_IP" \
+    "sudo hostnamectl set-hostname '$mHost' && \
+    sudo nmcli con mod enp1s0 \
+            ipv4.addresses '${HOST_ONLY_IP}/24' \
+            ipv4.gateway '10.10.1.1' \
+            ipv4.dns '10.10.1.1' \
+            ipv4.method manual && \
+    sudo nmcli con up enp1s0"
+
+    info "Static IP and hostname configured."
 
 
     echo "----------------------------------------------------------"

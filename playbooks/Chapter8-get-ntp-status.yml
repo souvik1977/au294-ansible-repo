@@ -1,0 +1,32 @@
+---
+- name: Play to get ntp status from the remote servers
+  hosts: "{{ targets }}"
+  become: true
+  vars:
+    target_service: chronyd
+  tasks:
+    - name: 1 - Check if chrony service is running or not
+      ansible.builtin.service_facts:
+
+    - name: 2 - Register if chronyd is running or not
+      ansible.builtin.set_fact:
+        chronyd_state: "running"
+      when: "( target_service + '.service') in ansible_facts.services"
+
+
+    - name: 3 - Register if chronyd is running or not
+      ansible.builtin.set_fact:
+        chronyd_state: "not_running"
+      when: "( target_service + '.service') not in ansible_facts.services"
+
+    - name: 4 - Display Result
+      ansible.builtin.debug:
+        msg: " {{ target_service }} is {{ chronyd_state }}"
+
+    - name: 5 - Capturng timesync status
+      ansible.builtin.command: timedatectl show --no-pager
+      register: timesync_stat
+
+    - name: 6 - Displaying timesync status
+      ansible.builtin.debug:
+        msg: "{{ timesync_stat.stdout | regex_replace('.*NTPSynchronized=(\\w+).*', '\\1', multiline=True) }}"

@@ -153,11 +153,45 @@ Validation commands:
 
 
 
-Adding DHCP reservation manually:
+Adding DHCP reservation manually on KVM Server:
 
 virsh net-update host-only \
 add-last ip-dhcp-host \
-"<host mac='52:54:00:0c:9b:6a' name='node4.lab.example.com' ip='10.10.1.23'/>" \
+"<host mac='52:54:00:53:31:30' name='node5.lab.example.com' ip='10.10.1.24'/>" \
 --live \
 --config \
 --parent-index 0
+
+virsh net-dumpxml host-only
+
+
+Trouble: VM's are unable to see DHCP serevations:
+
+Check points:
+
+virsh net-dumpxml host-only
+
+virsh net-dhcp-leases host-only
+
+[Expectation - above two commands should return same results of reservations.]
+
+Further Checks:
+
+arp -an | grep '10.10.1.' [Check MAC address specific entries here]
+
+ls -l /var/lib/libvirt/dnsmasq/
+
+cat /var/lib/libvirt/dnsmasq/host-only.hostsfile
+
+
+Check inside the VM:
+
+nmcli -g ipv4.method con show enp1s0
+
+
+sudo journalctl -u NetworkManager | grep DHCP | tail -20
+
+
+Fix: virsh reboot <VM>
+
+

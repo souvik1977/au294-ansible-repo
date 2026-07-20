@@ -1,0 +1,10 @@
+---
+- name: Testing timesync system role
+  hosts: "{{ targets }}"
+  vars:
+    timesync_ntp_servers:
+      - hostname: ://google.com
+        pool: true
+        iburst: true
+  roles:
+    - role: redhat.rhel_system_roles.timesync
